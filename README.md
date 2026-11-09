@@ -1,3 +1,13 @@
+> [!NOTE]
+> **This is Nicolai's fork of [durchgemacht/model27](https://github.com/durchgemacht/model27).** The original project,
+> its site (<https://durchgemacht.github.io/model27/>) and its issues are durchgemacht's; everything below is theirs
+> unless the fork says otherwise.
+>
+> - The branch `main` mirrors upstream exactly. The branch `nicolai` (the default here) adds Nicolai's own changes on
+>   top. Changes worth sharing go back upstream as pull requests.
+> - The fork's site, with its own flasher: <https://nicolai-creates.github.io/model27/>. How the fork works:
+>   [FORK.md](FORK.md).
+
 # model27
 
 **The Model:Cycles with added machines you can combine freely, built in your browser from your own copy of the
