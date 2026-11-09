@@ -246,3 +246,31 @@ $$("[data-load]").forEach((box) => {
   render();
 });
 })();
+
+// nicolai-creates/model27 only (FORK.md), not for upstream: the fork's name in every page's title and header, and the
+// header in Nicolai's colours (nicolai-creates.art: --ni-primary-000 orange, --ni-secondary-000 blue), so that its site
+// is not taken for durchgemacht's. One block at the end of this file, which every page loads, keeps the pages
+// themselves as upstream writes them.
+(function () {
+  const NAME = "model27-nicolai";
+  const style = document.createElement("style");
+  style.textContent = `
+:root { --ni-orange: rgb(239, 159, 0); --ni-blue: rgb(2, 50, 160); }
+header.top, header.site-top {
+  background: var(--ni-orange); color: var(--ni-blue); padding-bottom: 18px;
+  box-shadow: 0 0 0 100vmax var(--ni-orange); clip-path: inset(0 -100vmax);
+}
+header.top a, header.site-top a { color: inherit; }
+header.top nav a:hover, header.top nav a[aria-current="page"],
+header.site-top nav a:hover, header.site-top nav a[aria-current="page"] { text-decoration-color: currentColor; }
+header.top .theme-btn { color: var(--ni-blue); border-color: var(--ni-blue); background: none; }
+header.top .theme-btn:hover { color: var(--ni-orange); background: var(--ni-blue); }
+`;
+  document.head.appendChild(style);
+  document.title = document.title.replace(/\bmodel27\b/, NAME);
+  document.querySelectorAll("a.brand, a.site-brand").forEach((a) => {
+    if (a.textContent.trim() !== "model27") return;
+    a.textContent = NAME;
+    a.title = "Nicolai's fork of durchgemacht/model27";
+  });
+})();
