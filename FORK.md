@@ -37,6 +37,18 @@ upstream does not conflict with durchgemacht's frequent edits there.
   Locally, `main` tracks `upstream/main` (fast-forward only) and pushes to `github`, so on `main` a plain
   `git pull && git push` does the mirroring.
 
+- **Every day a workflow mirrors `main`, and only `main`** (`.github/workflows/sync-upstream.yml`, 05:17 UTC, or by
+  hand from the Actions tab).
+  - It fast-forwards `main` to upstream's, with the secret `SYNC_TOKEN`: a fine-grained token for this repository,
+    with Contents and Workflows read and write.
+  - It never touches `nicolai`. **Updating `nicolai` is Nicolai's deliberate step**: rebase, run the checks, maybe flash
+    and test, then push. Only then does the site change.
+  - When `nicolai` is behind, the workflow tries the rebase in the runner, without pushing, and reports in one open
+    issue labelled `upstream-sync`: how far behind, whether the rebase applies cleanly or where it conflicts, and the
+    new upstream commits.
+    - It comments on the issue (a notification) only when upstream has moved since the last report.
+    - It closes the issue once `nicolai` contains upstream's `main`.
+
 ## Pull requests to upstream
 
 - This repository is a GitHub fork of `durchgemacht/model27` (recreated as one on 2026-11-09), so pull requests go

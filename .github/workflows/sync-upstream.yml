@@ -1,0 +1,119 @@
+# nicolai-creates/model27 only (FORK.md), not for upstream: follow durchgemacht/model27 every day.
+# - main is fast-forwarded to upstream's main: a pure mirror, never rewritten.
+# - nicolai is NOT touched. Updating it is Nicolai's deliberate step (FORK.md). The workflow only tries the rebase in the
+#   runner, without pushing, and reports the result in one open issue labelled "upstream-sync": opened when nicolai
+#   falls behind, commented on when upstream moves again, closed once nicolai has caught up.
+#
+# Needs the secret SYNC_TOKEN: a fine-grained personal access token for this repository only, with "Contents" and
+# "Workflows" read and write. Pushing main would otherwise fail on an upstream commit that touches .github/workflows.
+name: Sync with upstream
+
+on:
+  schedule:
+    - cron: "17 5 * * *"   # every day, 05:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: sync-upstream
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: nicolai
+          fetch-depth: 0
+          token: ${{ secrets.SYNC_TOKEN }}
+
+      - name: Mirror main, try nicolai's rebase, report
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/durchgemacht/model27.git 2>/dev/null ||
+            git remote set-url upstream https://github.com/durchgemacht/model27.git
+          git fetch --no-tags upstream main
+          git fetch --no-tags origin main nicolai
+          up=$(git rev-parse upstream/main)
+          summary() { echo "$1" >> "$GITHUB_STEP_SUMMARY"; }
+
+          # 1. main mirrors upstream: fast-forward only
+          if ! git merge-base --is-ancestor origin/main upstream/main; then
+            echo "::error::upstream/main no longer contains this fork's main (history rewritten upstream?): sync by hand"
+            exit 1
+          fi
+          if [ "$(git rev-parse origin/main)" != "$up" ]; then
+            git push origin upstream/main:refs/heads/main
+            summary "main fast-forwarded to ${up:0:7}"
+          else
+            summary "main already at upstream (${up:0:7})"
+          fi
+
+          # 2. nicolai: is it behind, and would the rebase apply? Tried here, never pushed.
+          label=upstream-sync
+          if [ "$(gh api "repos/$GH_REPO" --jq .has_issues)" != "true" ]; then
+            echo "::error::Issues are disabled on $GH_REPO (Settings › General › Features): the report cannot be written"
+            exit 1
+          fi
+          issue=$(gh issue list --label "$label" --state open --json number --jq '.[0].number // empty' 2>/dev/null || true)
+          behind=$(git rev-list --count origin/nicolai..upstream/main)
+          if [ "$behind" -eq 0 ]; then
+            summary "nicolai contains upstream/main: nothing to report"
+            if [ -n "$issue" ]; then
+              gh issue close "$issue" --comment "nicolai has caught up with upstream (${up:0:7})."
+            fi
+            exit 0
+          fi
+
+          git switch --quiet --detach origin/nicolai
+          if git rebase --quiet upstream/main >/dev/null 2>&1; then
+            result="The rebase of \`nicolai\` onto it **applies cleanly** (tried in the runner, not pushed)."
+          else
+            files=$(git diff --name-only --diff-filter=U | sed 's/^/- `/; s/$/`/')
+            stopped=$(git log -1 --format='%h %s' REBASE_HEAD 2>/dev/null || echo "?")
+            git rebase --abort
+            result="The rebase of \`nicolai\` onto it **conflicts**, at \`$stopped\`, in:
+          $files"
+          fi
+          commits=$(git log --format='- `%h` %s (%an, %ad)' --date=short -n 50 origin/nicolai..upstream/main)
+          if [ "$behind" -gt 50 ]; then
+            commits="$commits
+          - … and $((behind - 50)) more"
+          fi
+          title="Upstream: nicolai is $behind commit(s) behind durchgemacht/model27"
+          body="<!-- upstream-head: $up -->
+          durchgemacht/model27 \`main\` is at [\`${up:0:7}\`](https://github.com/durchgemacht/model27/commit/$up); \`nicolai\` is $behind commit(s) behind it.
+
+          $result
+
+          Updating \`nicolai\` is a deliberate step (FORK.md):
+
+          \`\`\`sh
+          git switch main && git pull
+          git switch nicolai && git rebase main
+          # run the checks, maybe flash and test
+          git push --force-with-lease github nicolai
+          \`\`\`
+
+          New upstream commits:
+          $commits"
+          summary "$title"
+
+          gh label create "$label" --color FBCA04 --description "nicolai is behind upstream" 2>/dev/null || true
+          if [ -z "$issue" ]; then
+            gh issue create --title "$title" --label "$label" --body "$body"
+          else
+            last=$(gh issue view "$issue" --json body --jq .body | sed -n 's/^<!-- upstream-head: \([0-9a-f]*\) -->$/\1/p')
+            gh issue edit "$issue" --title "$title" --body "$body"
+            if [ "$last" != "$up" ]; then
+              gh issue comment "$issue" --body "Upstream moved to \`${up:0:7}\`: $behind commit(s) behind now. $result"
+            fi
+          fi
