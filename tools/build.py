@@ -99,7 +99,7 @@ def check_conflicts(chosen):
                 raise SystemExit(f"!! {t['id']} et {other} sont incompatibles ({why}) : "
                                  "choisis l'un ou l'autre avec -t")
         for need in t.get("requires", []):               # s'applique par-dessus un autre tweak (notes/31)
-            if need not in ids:
+            if need not in by_id:
                 raise SystemExit(f"!! {t['id']} demande aussi {need} (-t {need},{t['id']})")
 
 
